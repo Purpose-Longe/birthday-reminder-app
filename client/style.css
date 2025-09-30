@@ -1,0 +1,8 @@
+:root { --max-width: 720px; font-family: system-ui, Arial; }
+body { display:flex; align-items:flex-start; justify-content:center; padding:24px; background:#f7fafc; }
+.container { max-width: var(--max-width); background:white; padding:20px; border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,0.06);} 
+label { display:block; margin-bottom:12px; }
+input { width:100%; padding:8px; margin-top:6px; box-sizing:border-box; }
+button { padding:10px 16px; cursor:pointer; }
+#users li { margin-bottom:8px; }
+#msg { margin-top:12px; }
