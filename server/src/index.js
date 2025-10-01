@@ -23,9 +23,18 @@ mongoose
     } catch (err) {
       logger.error('Index creation failed', err);
     }
+
+    // --- Serve frontend ---
+    const path = require('path');
+    const clientPath = path.join(__dirname, '../../client');
+    app.use(require('express').static(clientPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientPath, 'index.html'));
+    });
+    // ----------------------
+
     app.listen(PORT, () => {
       logger.info(`Server listening on port ${PORT}`);
-      // start cron after server is up
       startCron();
     });
   })
@@ -33,3 +42,4 @@ mongoose
     logger.error('Failed to connect to MongoDB', err);
     process.exit(1);
   });
+
