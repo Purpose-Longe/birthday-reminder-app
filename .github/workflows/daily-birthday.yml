@@ -8,6 +8,7 @@ jobs:
   daily-birthday:
     name: Daily Birthday Scheduler
     runs-on: ubuntu-latest
+    environment: prod
     env:
       APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
       SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
