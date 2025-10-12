@@ -32,6 +32,9 @@ ENV NODE_ENV=production
 COPY --from=build-server /app/dist ./dist
 # Copy built frontend into server dist/public if present
 COPY --from=build-frontend /app/dist ./dist/public
+# Ensure runtime has node_modules (production dependencies). We copy from the deps stage
+# which ran `npm ci`. Alternative: run `npm ci --only=production` in this stage instead of copying.
+COPY --from=deps /app/node_modules ./node_modules
 ENV PORT=3001
 EXPOSE 3001
 CMD ["node", "dist/index.js"]
