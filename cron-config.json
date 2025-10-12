@@ -1,0 +1,20 @@
+{
+  "cron_jobs": [
+    {
+      "name": "Birthday Email Reminder",
+      "description": "Checks for birthdays and sends automated email greetings daily at 7:00 AM",
+      "schedule": "0 7 * * *",
+      "timezone": "UTC",
+      "endpoint": "/api/birthday/check",
+      "method": "POST",
+      "enabled": true
+    }
+  ],
+  "notes": [
+    "This cron job runs every day at 7:00 AM UTC",
+    "Adjust timezone in your deployment platform settings if needed",
+    "The endpoint will automatically query the database for birthdays matching today's date",
+    "Birthday emails will be sent to all matching users",
+    "Check server logs to monitor email delivery status"
+  ]
+}
