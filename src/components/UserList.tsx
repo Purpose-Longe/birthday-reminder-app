@@ -19,11 +19,9 @@ export const UserList = ({ refreshTrigger }: UserListProps) => {
 
   const fetchUsers = async () => {
     try {
-      const apiBase = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiBase}/api/users`);
-      if (!response.ok) throw new Error('Failed to fetch users');
-      const data = await response.json();
-      setUsers(data);
+  const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+  const data = await (await import('../utils/fetchJson')).fetchJson(`${apiBase}/api/users`);
+  setUsers(data);
       setError('');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -41,12 +39,10 @@ export const UserList = ({ refreshTrigger }: UserListProps) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const apiBase = import.meta.env.VITE_API_URL || '';
-      const response = await fetch(`${apiBase}/api/users/${id}`, {
+      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+      await (await import('../utils/fetchJson')).fetchJson(`${apiBase}/api/users/${id}`, {
         method: 'DELETE',
       });
-
-      if (!response.ok) throw new Error('Failed to delete user');
 
       setUsers(users.filter(user => user.id !== id));
     } catch (err: unknown) {
@@ -56,10 +52,37 @@ export const UserList = ({ refreshTrigger }: UserListProps) => {
   };
 
   const formatDate = (dateString: string) => {
-    // Parse as UTC date to match server-stored UTC timestamps
-    const date = new Date(dateString);
-    // Use UTC components for consistent display relative to stored value
-    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toLocaleDateString('en-US', {
+    // Normalize input which may be either 'YYYY-MM-DD' or an ISO datetime 'YYYY-MM-DDTHH:mm:...Z'
+    const raw = String(dateString || '');
+    let y = NaN, m = NaN, d = NaN;
+    if (raw.includes('T')) {
+      const datePart = raw.split('T')[0];
+      const [yy, mm, dd] = datePart.split('-');
+      y = Number(yy);
+      m = Number(mm) - 1;
+      d = Number(dd);
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const [yy, mm, dd] = raw.split('-');
+      y = Number(yy);
+      m = Number(mm) - 1;
+      d = Number(dd);
+    } else {
+      // fallback to Date parsing
+      const parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) {
+        y = parsed.getUTCFullYear();
+        m = parsed.getUTCMonth();
+        d = parsed.getUTCDate();
+      }
+    }
+
+    if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) {
+      return 'Invalid Date';
+    }
+
+    const utcDate = new Date(Date.UTC(y, m, d));
+    return utcDate.toLocaleDateString('en-US', {
+      timeZone: 'UTC',
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -70,9 +93,28 @@ export const UserList = ({ refreshTrigger }: UserListProps) => {
     // Use UTC-aware calculations so "Today"/"Tomorrow" match server-side UTC birthday checks
     const now = new Date();
     const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const birth = new Date(dateString);
-    const birthMonth = birth.getUTCMonth();
-    const birthDay = birth.getUTCDate();
+    // Normalize date string (handle both YYYY-MM-DD and ISO datetimes)
+    const raw = String(dateString || '');
+    let birthMonth = NaN;
+    let birthDay = NaN;
+    if (raw.includes('T')) {
+      const datePart = raw.split('T')[0];
+      const [, mm, dd] = datePart.split('-');
+      birthMonth = Number(mm) - 1;
+      birthDay = Number(dd);
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const [, mm, dd] = raw.split('-');
+      birthMonth = Number(mm) - 1;
+      birthDay = Number(dd);
+    } else {
+      const parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) {
+        birthMonth = parsed.getUTCMonth();
+        birthDay = parsed.getUTCDate();
+      }
+    }
+
+    if (Number.isNaN(birthMonth) || Number.isNaN(birthDay)) return 'Invalid Date';
 
     let thisYear = now.getUTCFullYear();
     let birthdayUTC = Date.UTC(thisYear, birthMonth, birthDay);
@@ -91,10 +133,31 @@ export const UserList = ({ refreshTrigger }: UserListProps) => {
 
   const isBirthdayToday = (dateString: string) => {
     const now = new Date();
-    const birth = new Date(dateString);
+    const raw = String(dateString || '');
+    let birthMonth = NaN;
+    let birthDay = NaN;
+    if (raw.includes('T')) {
+      const datePart = raw.split('T')[0];
+      const [, mm, dd] = datePart.split('-');
+      birthMonth = Number(mm) - 1;
+      birthDay = Number(dd);
+    } else if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      const [, mm, dd] = raw.split('-');
+      birthMonth = Number(mm) - 1;
+      birthDay = Number(dd);
+    } else {
+      const parsed = new Date(raw);
+      if (!isNaN(parsed.getTime())) {
+        birthMonth = parsed.getUTCMonth();
+        birthDay = parsed.getUTCDate();
+      }
+    }
+
+    if (Number.isNaN(birthMonth) || Number.isNaN(birthDay)) return false;
+
     return (
-      now.getUTCMonth() === birth.getUTCMonth() &&
-      now.getUTCDate() === birth.getUTCDate()
+      now.getUTCMonth() === birthMonth &&
+      now.getUTCDate() === birthDay
     );
   };
 

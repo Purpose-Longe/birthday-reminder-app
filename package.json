@@ -8,8 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json",
-    "build:server": "tsc -p tsconfig.server.json",
+  "typecheck": "tsc --noEmit -p tsconfig.app.json",
+  "prebuild:server": "node -e \"const fs=require('fs'); if(!fs.existsSync('./node_modules/typescript')){console.error('Missing local TypeScript. Run npm ci to install dependencies.'); process.exit(1);}\"",
+  "build:server": "npx tsc -p tsconfig.server.json",
     "server": "npm run build:server && node dist/index.js",
     "server:dev": "cross-env TS_NODE_PROJECT=tsconfig.server.json nodemon --exec node --loader ts-node/esm server/index.ts"
   },

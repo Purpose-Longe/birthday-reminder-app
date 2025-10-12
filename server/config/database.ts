@@ -15,6 +15,13 @@ export const getPool = (): Pool => {
     ssl: { rejectUnauthorized: false },
   });
 
+  // Ensure each session uses UTC so server-side CURRENT_DATE and timestamps are consistent
+  pool.on('connect', (client) => {
+    client.query(`SET TIME ZONE 'UTC'`).catch((err) => {
+      console.warn('Failed to set session time zone to UTC:', err?.message ?? err);
+    });
+  });
+
   pool.on('error', (err) => {
     console.error('Unexpected error on idle client', err);
     process.exit(-1);

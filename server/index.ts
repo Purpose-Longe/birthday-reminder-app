@@ -11,7 +11,31 @@ import fs from 'fs';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
+// Configure CORS to allow the frontend origin if provided in APP_BASE_URL
+// and allow localhost origins while developing to avoid CORS blocking during local dev.
+const appBaseUrl = process.env.APP_BASE_URL;
+const isProd = process.env.NODE_ENV === 'production';
+const devLocalhosts = ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000', 'http://127.0.0.1:3000'];
+
+if (appBaseUrl || !isProd) {
+  const allowed = [] as string[];
+  if (appBaseUrl) allowed.push(appBaseUrl);
+  if (!isProd) allowed.push(...devLocalhosts);
+
+  app.use(cors({
+    origin: (origin, callback) => {
+      // allow requests with no origin (curl, Postman)
+      if (!origin) return callback(null, true);
+      if (allowed.includes(origin)) return callback(null, true);
+      console.warn('Blocked CORS request from origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  }));
+
+  console.log('Allowed CORS origins:', allowed);
+} else {
+  app.use(cors());
+}
 app.use(express.json());
 
 app.get('/health', (req, res) => {
@@ -26,8 +50,7 @@ const publicDir = path.resolve(process.cwd(), 'dist', 'public');
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
   // Serve index.html for any non-API routes so client-side routing works
-  // Use a safer pattern that doesn't register an invalid parameter name with path-to-regexp.
-  app.get('/*', (req, res) => {
+  app.get('*', (req, res) => {
     if (req.path.startsWith('/api')) return res.status(404).end();
     res.sendFile(path.join(publicDir, 'index.html'));
   });
@@ -35,8 +58,7 @@ if (fs.existsSync(publicDir)) {
 
 const startServer = async () => {
   try {
-    await initializeDatabase();
-    console.log('Database initialized successfully');
+  await initializeDatabase();
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

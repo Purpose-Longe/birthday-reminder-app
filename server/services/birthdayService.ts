@@ -13,7 +13,7 @@ export const checkAndSendBirthdayEmails = async (): Promise<{ sent: number; fail
 
   try {
     const query = `
-      SELECT id, username, email, date_of_birth
+      SELECT id, username, email, to_char(date_of_birth, 'YYYY-MM-DD') AS date_of_birth
       FROM users
       WHERE EXTRACT(MONTH FROM date_of_birth) = EXTRACT(MONTH FROM CURRENT_DATE)
         AND EXTRACT(DAY FROM date_of_birth) = EXTRACT(DAY FROM CURRENT_DATE)
@@ -53,7 +53,8 @@ export const getAllUsers = async (): Promise<User[]> => {
   const client = await getPool().connect();
 
   try {
-    const query = 'SELECT id, username, email, date_of_birth FROM users ORDER BY created_at DESC';
+    // Return date_of_birth as YYYY-MM-DD to ensure no timezone information is included
+    const query = `SELECT id, username, email, to_char(date_of_birth, 'YYYY-MM-DD') AS date_of_birth FROM users ORDER BY created_at DESC`;
     const result = await client.query(query);
     return result.rows;
   } catch (error) {
@@ -71,7 +72,7 @@ export const createUser = async (username: string, email: string, dateOfBirth: s
     const query = `
       INSERT INTO users (username, email, date_of_birth)
       VALUES ($1, $2, $3)
-      RETURNING id, username, email, date_of_birth
+      RETURNING id, username, email, to_char(date_of_birth, 'YYYY-MM-DD') AS date_of_birth
     `;
 
     const result = await client.query(query, [username, email, dateOfBirth]);
