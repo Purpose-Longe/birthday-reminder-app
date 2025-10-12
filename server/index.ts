@@ -1,6 +1,6 @@
 // Ensure environment variables are loaded before importing modules that use them.
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import usersRouter from './routes/users.js';
 import birthdayRouter from './routes/birthday.js';
@@ -49,9 +49,14 @@ app.use('/api/birthday', birthdayRouter);
 const publicDir = path.resolve(process.cwd(), 'dist', 'public');
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
-  // Serve index.html for any non-API routes so client-side routing works
-  app.get('*', (req, res) => {
-    if (req.path.startsWith('/api')) return res.status(404).end();
+  // Serve index.html for any non-API routes so client-side routing works.
+  // Avoid using wildcard route patterns that path-to-regexp may reject in some versions.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Let API routes 404/return as normal
+    if (req.path.startsWith('/api')) return next();
+
+    // If the request is for a file that exists in the static dir, let express.static handle it (next won't be called here),
+    // but for client-side routes, send index.html so the SPA router can take over.
     res.sendFile(path.join(publicDir, 'index.html'));
   });
 }
