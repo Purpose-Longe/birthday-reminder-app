@@ -26,7 +26,8 @@ const publicDir = path.resolve(process.cwd(), 'dist', 'public');
 if (fs.existsSync(publicDir)) {
   app.use(express.static(publicDir));
   // Serve index.html for any non-API routes so client-side routing works
-  app.get('*', (req, res) => {
+  // Use a safer pattern that doesn't register an invalid parameter name with path-to-regexp.
+  app.get('/*', (req, res) => {
     if (req.path.startsWith('/api')) return res.status(404).end();
     res.sendFile(path.join(publicDir, 'index.html'));
   });
