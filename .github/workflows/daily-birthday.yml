@@ -1,0 +1,129 @@
+name: "Daily Birthday Scheduler"
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-birthday:
+    name: Daily Birthday Scheduler
+    runs-on: ubuntu-latest
+    env:
+      APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+      SCHEDULER_SECRET: ${{ secrets.SCHEDULER_SECRET }}
+    steps:
+      - name: Checkout repository (optional)
+        uses: actions/checkout@v4
+
+      - name: Print timestamp and endpoint (no secret shown)
+        shell: bash
+        run: |
+          ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          app_base="${APP_BASE_URL%/}"
+          endpoint="${app_base}/api/birthday/check"
+          echo "Timestamp (UTC): $ts"
+          echo "Endpoint: $endpoint"
+
+      - name: Call scheduler endpoint with retries and save response
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          app_base="${APP_BASE_URL%/}"
+          endpoint="${app_base}/api/birthday/check"
+          out_file="response.txt"
+          err_file="curl-stderr.txt"
+          attempts=3
+          backoffs=(5 10 20)
+
+          final_status=""
+          final_curl_exit=0
+
+          echo "Calling endpoint: $endpoint"
+          echo "Writing response body to $out_file"
+
+          for i in $(seq 1 $attempts); do
+            echo "Attempt $i of $attempts..."
+            curl_exit=0
+            http_code=$(curl -sS -o "$out_file" -w "%{http_code}" -X POST "$endpoint" -H "x-scheduler-secret: $SCHEDULER_SECRET" 2> "$err_file") || curl_exit=$?
+
+            if [ "$curl_exit" -ne 0 ]; then
+              echo "curl exited with code $curl_exit (network/TLS error). See $err_file for details." >&2
+              final_status=""
+            else
+              final_status="$http_code"
+              echo "HTTP status: $final_status"
+            fi
+
+            if [ "$curl_exit" -eq 0 ] && [ -n "$final_status" ] && [ "$final_status" -ge 200 ] && [ "$final_status" -lt 400 ]; then
+              echo "Request successful (status $final_status)."
+              final_curl_exit=0
+              break
+            fi
+
+            final_curl_exit=$curl_exit
+
+            if [ "$i" -lt "$attempts" ]; then
+              backoff=${backoffs[$((i-1))]}
+              echo "Request failed (status/curl: $final_status / $final_curl_exit). Retrying in ${backoff}s..."
+              sleep "$backoff"
+            else
+              echo "Final attempt completed."
+            fi
+          done
+
+          echo "---- Response body (first 10000 chars) ----"
+          if [ -f "$out_file" ]; then
+            head -c 10000 "$out_file" || true
+            echo
+          else
+            echo "(no response file found)"
+          fi
+          echo "---- End response preview ----"
+
+          if [ "$final_curl_exit" -ne 0 ]; then
+            echo "ERROR: curl/network failed after $attempts attempt(s). Exit code: $final_curl_exit" >&2
+            echo "See $err_file for curl stderr output:" >&2
+            cat "$err_file" >&2 || true
+            echo "Uploading $out_file for inspection and exiting with failure."
+            exit 1
+          fi
+
+          if [ -z "$final_status" ]; then
+            echo "ERROR: No HTTP status captured. Treating as failure." >&2
+            exit 1
+          fi
+
+          if [ "$final_status" -ge 400 ]; then
+            echo "ERROR: Received HTTP status $final_status (>= 400). Failing job." >&2
+            exit 1
+          fi
+
+          echo "SUMMARY: Request completed with HTTP status $final_status"
+          echo "Response saved to $out_file"
+
+      - name: Upload response artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: birthday-check-response
+          path: response.txt
+
+      - name: Upload curl stderr (if exists) for debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: birthday-check-curl-stderr
+          path: curl-stderr.txt
+
+      - name: Print final short summary
+        if: success()
+        shell: bash
+        run: |
+          echo "Daily Birthday Scheduler finished: success."
+
+      - name: Print final short summary (failure)
+        if: failure()
+        shell: bash
+        run: |
+          echo "Daily Birthday Scheduler finished: failure. Response and curl stderr uploaded as artifacts."
